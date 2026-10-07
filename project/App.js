@@ -1,8 +1,9 @@
 import { StatusBar } from 'expo-status-bar';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { supabase } from './src/utils/supabase';
 
 const shortcuts = [
   { icon: 'person', label: 'Dados Pessoais', route: '/personal' },
@@ -23,6 +24,43 @@ const tabs = [
 export default function App() {
   const router = useRouter();
   const [showAlert, setShowAlert] = useState(true);
+  const [user, setUser] = useState({
+    full_name: 'Croché',
+    email: 'croche@email.com',
+    phone: '(11) 99999-9999',
+    age: 35,
+    blood_type: 'O+',
+    height: 1.75,
+  });
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, []);
+
+  const fetchUserProfile = async () => {
+    try {
+      if (!supabase) {
+        console.log('Supabase não configurado, usando dados padrão');
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', 'croche@email.com')
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        setUser(data);
+      } else {
+        console.log('Usuário não encontrado no banco, usando dados padrão');
+      }
+    } catch (error) {
+      console.error('Erro ao buscar perfil do usuário:', error);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -59,14 +97,14 @@ export default function App() {
         <View style={styles.profileCard}>
           <View style={styles.profileTop}>
             <View style={styles.avatarColumn}>
-              <Text style={styles.profileName}>Croché</Text>
+              <Text style={styles.profileName}>{user.full_name?.split(' ')[0] || 'Croché'}</Text>
               <View style={styles.avatarFrame}>
                 <Text style={styles.duck}>🐤</Text>
                 <Pressable accessibilityLabel="Alterar foto" style={styles.cameraButton}>
                   <Ionicons name="camera" size={23} color="#fff" />
                 </Pressable>
               </View>
-              <Text style={styles.memberSince}>Membro desde 2024</Text>
+              <Text style={styles.memberSince}>Membro desde {user.member_since ? new Date(user.member_since).getFullYear() : '2024'}</Text>
             </View>
 
             <View style={styles.contactList}>
@@ -74,21 +112,21 @@ export default function App() {
                 <Ionicons name="person" size={23} color="#fff" style={styles.contactIcon} />
                 <View style={styles.contactInfo}>
                   <Text style={styles.contactLabel}>Nome completo</Text>
-                  <Text style={styles.contactValue}>Croché da Silva</Text>
+                  <Text style={styles.contactValue}>{user.full_name || 'Croché da Silva'}</Text>
                 </View>
               </View>
               <View style={styles.contactRow}>
                 <Ionicons name="mail" size={23} color="#fff" style={styles.contactIcon} />
                 <View style={styles.contactInfo}>
                   <Text style={styles.contactLabel}>Email</Text>
-                  <Text style={styles.contactValue}>croche@email.com</Text>
+                  <Text style={styles.contactValue}>{user.email || 'croche@email.com'}</Text>
                 </View>
               </View>
               <View style={styles.contactRow}>
                 <Ionicons name="call" size={23} color="#fff" style={styles.contactIcon} />
                 <View style={styles.contactInfo}>
                   <Text style={styles.contactLabel}>Telefone</Text>
-                  <Text style={styles.contactValue}>(11) 99999-9999</Text>
+                  <Text style={styles.contactValue}>{user.phone || '(11) 99999-9999'}</Text>
                 </View>
               </View>
             </View>
@@ -98,17 +136,17 @@ export default function App() {
           <View style={styles.metrics}>
             <View style={styles.metric}>
               <Ionicons name="calendar" size={27} color="#fff" />
-              <Text style={styles.metricValue}>35</Text>
+              <Text style={styles.metricValue}>{user.age || 35}</Text>
               <Text style={styles.metricLabel}>Idade</Text>
             </View>
             <View style={styles.metric}>
               <Ionicons name="water" size={28} color="#fff" />
-              <Text style={styles.metricValue}>O+</Text>
+              <Text style={styles.metricValue}>{user.blood_type || 'O+'}</Text>
               <Text style={styles.metricSmallLabel}>Tipo Sanguíneo</Text>
             </View>
             <View style={[styles.metric, styles.lastMetric]}>
               <Ionicons name="resize-outline" size={26} color="#fff" />
-              <Text style={styles.metricValue}>1.75</Text>
+              <Text style={styles.metricValue}>{user.height || 1.75}</Text>
               <Text style={styles.metricLabel}>Altura (m)</Text>
             </View>
           </View>

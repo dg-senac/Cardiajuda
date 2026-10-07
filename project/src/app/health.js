@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import {
   Image,
   Pressable,
@@ -12,13 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BottomNavigation } from '../../App';
-
-const initialRecords = [
-  { id: 1, date: 'Hoje · 08:30', pressure: '138/88', glucose: '108', warning: true },
-  { id: 2, date: 'Ontem · 19:10', pressure: '126/82', glucose: '102', warning: false },
-  { id: 3, date: '12/09 · 07:45', pressure: '122/79', glucose: '94', warning: false },
-  { id: 4, date: '10/09 · 08:20', pressure: '130/85', glucose: '99', warning: false },
-];
+import { supabase } from '../utils/supabase';
 
 export default function HealthScreen() {
   const scrollRef = useRef(null);
@@ -28,11 +22,42 @@ export default function HealthScreen() {
   const [glucose, setGlucose] = useState('');
   const [showPressure, setShowPressure] = useState(true);
   const [showGlucose, setShowGlucose] = useState(true);
-  const [records, setRecords] = useState(initialRecords);
+  const [records, setRecords] = useState([]);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchRecords();
+  }, []);
+
+  const fetchRecords = async () => {
+    try {
+      if (!supabase) {
+        setRecords([
+          { id: 1, date: 'Hoje · 08:30', systolic: 138, diastolic: 88, glucose: 108, warning: true },
+          { id: 2, date: 'Ontem · 19:10', systolic: 126, diastolic: 82, glucose: 102, warning: false },
+          { id: 3, date: '12/09 · 07:45', systolic: 122, diastolic: 79, glucose: 94, warning: false },
+          { id: 4, date: '10/09 · 08:20', systolic: 130, diastolic: 85, glucose: 99, warning: false },
+        ]);
+        setLoading(false);
+        return;
+      }
+      const { data, error } = await supabase
+        .from('health_records')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setRecords(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar registros:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   function validateInputs() {
     const systolicValue = Number(systolic);
@@ -75,26 +100,65 @@ export default function HealthScreen() {
     return true;
   }
 
-  function saveMeasurement() {
+  async function saveMeasurement() {
     if (!validateInputs()) return;
 
     setIsSaving(true);
     setErrorMessage('');
 
-    setTimeout(() => {
+    try {
       const time = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
       const systolicValue = Number(systolic);
       const glucoseValue = Number(glucose);
 
       if (editingId) {
+        if (!supabase) {
+          setRecords((currentRecords) =>
+            currentRecords.map((record) =>
+              record.id === editingId
+                ? {
+                    ...record,
+                    date: `Hoje · ${time}`,
+                    systolic: showPressure ? systolicValue : record.systolic,
+                    diastolic: showPressure ? Number(diastolic) : record.diastolic,
+                    glucose: showGlucose ? glucoseValue : record.glucose,
+                    warning: (showPressure && systolicValue >= 140) || (showGlucose && glucoseValue >= 126),
+                  }
+                : record
+            )
+          );
+          setSuccessMessage('Medição atualizada com sucesso!');
+          setEditingId(null);
+          setSystolic('');
+          setDiastolic('');
+          setGlucose('');
+          setIsSaving(false);
+          setTimeout(() => setSuccessMessage(''), 3000);
+          return;
+        }
+
+        const { error } = await supabase
+          .from('health_records')
+          .update({
+            date: `Hoje · ${time}`,
+            systolic: showPressure ? systolicValue : null,
+            diastolic: showPressure ? Number(diastolic) : null,
+            glucose: showGlucose ? glucoseValue : null,
+            warning: (showPressure && systolicValue >= 140) || (showGlucose && glucoseValue >= 126),
+          })
+          .eq('id', editingId);
+
+        if (error) throw error;
+
         setRecords((currentRecords) =>
           currentRecords.map((record) =>
             record.id === editingId
               ? {
                   ...record,
                   date: `Hoje · ${time}`,
-                  pressure: showPressure ? `${systolic}/${diastolic}` : record.pressure,
-                  glucose: showGlucose ? glucose : record.glucose,
+                  systolic: showPressure ? systolicValue : record.systolic,
+                  diastolic: showPressure ? Number(diastolic) : record.diastolic,
+                  glucose: showGlucose ? glucoseValue : record.glucose,
                   warning: (showPressure && systolicValue >= 140) || (showGlucose && glucoseValue >= 126),
                 }
               : record
@@ -104,13 +168,32 @@ export default function HealthScreen() {
         setEditingId(null);
       } else {
         const newRecord = {
-          id: Date.now(),
           date: `Hoje · ${time}`,
-          pressure: showPressure ? `${systolic}/${diastolic}` : '-',
-          glucose: showGlucose ? glucose : '-',
+          systolic: showPressure ? systolicValue : null,
+          diastolic: showPressure ? Number(diastolic) : null,
+          glucose: showGlucose ? glucoseValue : null,
           warning: (showPressure && systolicValue >= 140) || (showGlucose && glucoseValue >= 126),
         };
-        setRecords((currentRecords) => [newRecord, ...currentRecords]);
+
+        if (!supabase) {
+          setRecords((currentRecords) => [{ ...newRecord, id: Date.now() }, ...currentRecords]);
+          setSuccessMessage('Medição salva com sucesso!');
+          setSystolic('');
+          setDiastolic('');
+          setGlucose('');
+          setIsSaving(false);
+          setTimeout(() => setSuccessMessage(''), 3000);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('health_records')
+          .insert([newRecord])
+          .select();
+
+        if (error) throw error;
+
+        setRecords((currentRecords) => [data[0], ...currentRecords]);
         setSuccessMessage('Medição salva com sucesso!');
       }
 
@@ -120,25 +203,46 @@ export default function HealthScreen() {
       setIsSaving(false);
 
       setTimeout(() => setSuccessMessage(''), 3000);
-    }, 500);
+    } catch (error) {
+      console.error('Erro ao salvar medição:', error);
+      setErrorMessage('Erro ao salvar medição');
+      setIsSaving(false);
+    }
   }
 
   function editRecord(record) {
     setEditingId(record.id);
-    const pressureParts = record.pressure.split('/');
-    setSystolic(pressureParts[0] !== '-' ? pressureParts[0] : '');
-    setDiastolic(pressureParts[1] !== '-' ? pressureParts[1] : '');
-    setGlucose(record.glucose !== '-' ? record.glucose : '');
-    setShowPressure(record.pressure !== '-');
-    setShowGlucose(record.glucose !== '-');
+    setSystolic(record.systolic ? record.systolic.toString() : '');
+    setDiastolic(record.diastolic ? record.diastolic.toString() : '');
+    setGlucose(record.glucose ? record.glucose.toString() : '');
+    setShowPressure(record.systolic !== null);
+    setShowGlucose(record.glucose !== null);
     systolicRef.current?.focus();
     scrollRef.current?.scrollTo({ y: 0, animated: true });
   }
 
-  function deleteRecord(id) {
-    setRecords((currentRecords) => currentRecords.filter((record) => record.id !== id));
-    setSuccessMessage('Registro excluído');
-    setTimeout(() => setSuccessMessage(''), 2000);
+  async function deleteRecord(id) {
+    try {
+      if (!supabase) {
+        setRecords((currentRecords) => currentRecords.filter((record) => record.id !== id));
+        setSuccessMessage('Registro excluído');
+        setTimeout(() => setSuccessMessage(''), 2000);
+        return;
+      }
+
+      const { error } = await supabase
+        .from('health_records')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setRecords((currentRecords) => currentRecords.filter((record) => record.id !== id));
+      setSuccessMessage('Registro excluído');
+      setTimeout(() => setSuccessMessage(''), 2000);
+    } catch (error) {
+      console.error('Erro ao excluir registro:', error);
+    }
   }
 
   function cancelEdit() {
@@ -155,16 +259,15 @@ export default function HealthScreen() {
   }
 
   function getHealthStatus(record) {
-    if (record.pressure === '-' && record.glucose === '-') {
+    if (record.systolic === null && record.glucose === null) {
       return { icon: 'help-circle', color: '#77717a', label: 'Incompleto' };
     }
 
-    const pressureParts = record.pressure.split('/');
-    const systolicValue = Number(pressureParts[0]);
-    const glucoseValue = Number(record.glucose);
+    const systolicValue = record.systolic || 0;
+    const glucoseValue = record.glucose || 0;
 
-    const pressureWarning = record.pressure !== '-' && systolicValue >= 140;
-    const glucoseWarning = record.glucose !== '-' && glucoseValue >= 126;
+    const pressureWarning = record.systolic !== null && systolicValue >= 140;
+    const glucoseWarning = record.glucose !== null && glucoseValue >= 126;
 
     if (pressureWarning || glucoseWarning) {
       return { icon: 'warning', color: '#f59e0b', label: 'Atenção' };
@@ -195,7 +298,11 @@ export default function HealthScreen() {
         <View style={styles.summaryCard}>
           <View style={styles.summaryItem}>
             <Ionicons name="heart" size={32} color="#870095" />
-            <Text style={styles.summaryValue}>{records[0]?.pressure || '-'}</Text>
+            <Text style={styles.summaryValue}>
+              {records[0]?.systolic && records[0]?.diastolic
+                ? `${records[0].systolic}/${records[0].diastolic}`
+                : '-'}
+            </Text>
             <Text style={styles.summaryLabel}>Última PA</Text>
           </View>
           <View style={styles.summaryDivider} />
@@ -402,10 +509,10 @@ export default function HealthScreen() {
                   <Text style={styles.recordDate}>{record.date}</Text>
                   <View style={styles.recordValues}>
                     <Text style={styles.recordPressure}>
-                      PA {record.pressure !== '-' ? record.pressure : 'Não registrada'}
+                      PA {record.systolic && record.diastolic ? `${record.systolic}/${record.diastolic}` : 'Não registrada'}
                     </Text>
                     <Text style={styles.recordGlucose}>
-                      Glicemia {record.glucose !== '-' ? record.glucose : 'Não registrada'}
+                      Glicemia {record.glucose ? record.glucose : 'Não registrada'}
                     </Text>
                   </View>
                 </View>

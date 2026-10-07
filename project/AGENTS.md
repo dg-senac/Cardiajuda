@@ -39,3 +39,24 @@ Docs: https://docs.expo.dev/eas/index.md
 - If `ios/` and `android/` directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` and config plugins.
 - Expo Go only includes its bundled native modules. After adding a library with native code, the app needs a development build: `npx expo run:ios|android` locally, or `eas build --profile development`.
 - Prefer recommended Expo modules over third-party libraries, and check your available skills before adding dependencies. Docs: https://docs.expo.dev/versions/latest/index.md
+
+## Supabase Integration
+
+This project uses Supabase for persistent data storage.
+
+### Setup
+- Environment variables are required in `.env` file (see `.env.example`)
+- Client configuration: `src/utils/supabase.js`
+- Database schema: `supabase-schema.sql`
+- Setup guide: `SUPABASE_SETUP.md`
+
+### Tables
+- `users` - User profile data
+- `appointments` - Medical appointments
+- `health_records` - Blood pressure and glucose measurements
+- `doctors` - Available doctors
+
+### Important
+- The `.env` file is gitignored for security
+- Do not commit Supabase credentials
+- RLS (Row Level Security) is enabled on all user data tables

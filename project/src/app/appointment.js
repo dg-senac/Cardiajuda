@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Image,
   Pressable,
@@ -11,21 +11,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BottomNavigation } from '../../App';
+import { supabase } from '../utils/supabase';
 
 const daysOfWeek = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 
-const doctors = [
-  { id: 1, name: 'Dr. Silva', specialty: 'Cardiologista', rating: 4.8 },
-  { id: 2, name: 'Dra. Costa', specialty: 'Endocrinologista', rating: 4.9 },
-  { id: 3, name: 'Dr. Oliveira', specialty: 'Clínico Geral', rating: 4.7 },
-];
-
 const timeSlots = ['08:00', '09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00'];
-
-const initialAppointments = [
-  { date: 'Out 15, 2026', time: '14:00', doctor: 'Dr. Silva', specialty: 'Cardiologista', status: 'confirmado' },
-  { date: 'Out 22, 2026', time: '10:00', doctor: 'Dra. Costa', specialty: 'Endocrinologista', status: 'pendente' },
-];
 
 export default function AppointmentScreen() {
   const [selectedDate, setSelectedDate] = useState(null);
@@ -33,8 +23,61 @@ export default function AppointmentScreen() {
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [currentMonth, setCurrentMonth] = useState('Outubro 2026');
   const [showNewAppointment, setShowNewAppointment] = useState(false);
-  const [appointments, setAppointments] = useState(initialAppointments);
-  
+  const [appointments, setAppointments] = useState([]);
+  const [doctors, setDoctors] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchDoctors();
+    fetchAppointments();
+  }, []);
+
+  const fetchDoctors = async () => {
+    try {
+      if (!supabase) {
+        setDoctors([
+          { id: 1, name: 'Dr. Silva', specialty: 'Cardiologista', rating: 4.8 },
+          { id: 2, name: 'Dra. Costa', specialty: 'Endocrinologista', rating: 4.9 },
+          { id: 3, name: 'Dr. Oliveira', specialty: 'Clínico Geral', rating: 4.7 },
+        ]);
+        return;
+      }
+      const { data, error } = await supabase
+        .from('doctors')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      setDoctors(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar médicos:', error);
+    }
+  };
+
+  const fetchAppointments = async () => {
+    try {
+      if (!supabase) {
+        setAppointments([
+          { date: 'Out 15, 2026', time: '14:00', doctor_name: 'Dr. Silva', specialty: 'Cardiologista', status: 'confirmado' },
+          { date: 'Out 22, 2026', time: '10:00', doctor_name: 'Dra. Costa', specialty: 'Endocrinologista', status: 'pendente' },
+        ]);
+        setLoading(false);
+        return;
+      }
+      const { data, error } = await supabase
+        .from('appointments')
+        .select('*')
+        .order('date', { ascending: true });
+
+      if (error) throw error;
+      setAppointments(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar agendamentos:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Generate calendar days for October 2026
   const generateCalendarDays = () => {
     const days = [];
@@ -61,24 +104,44 @@ export default function AppointmentScreen() {
     return appointments.some(apt => apt.date.includes(day.toString()));
   };
 
-  const saveAppointment = () => {
+  const saveAppointment = async () => {
     if (!selectedDate || !selectedTime || !selectedDoctor) {
       return;
     }
 
-    const newAppointment = {
-      date: `Out ${selectedDate}, 2026`,
-      time: selectedTime,
-      doctor: selectedDoctor.name,
-      specialty: selectedDoctor.specialty,
-      status: 'pendente',
-    };
+    try {
+      const newAppointment = {
+        date: `Out ${selectedDate}, 2026`,
+        time: selectedTime,
+        doctor_name: selectedDoctor.name,
+        specialty: selectedDoctor.specialty,
+        status: 'pendente',
+      };
 
-    setAppointments([newAppointment, ...appointments]);
-    setSelectedDate(null);
-    setSelectedTime(null);
-    setSelectedDoctor(null);
-    setShowNewAppointment(false);
+      if (!supabase) {
+        setAppointments([{ ...newAppointment, id: Date.now() }, ...appointments]);
+        setSelectedDate(null);
+        setSelectedTime(null);
+        setSelectedDoctor(null);
+        setShowNewAppointment(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('appointments')
+        .insert([newAppointment])
+        .select();
+
+      if (error) throw error;
+
+      setAppointments([data[0], ...appointments]);
+      setSelectedDate(null);
+      setSelectedTime(null);
+      setSelectedDoctor(null);
+      setShowNewAppointment(false);
+    } catch (error) {
+      console.error('Erro ao salvar agendamento:', error);
+    }
   };
 
   return (
@@ -232,7 +295,7 @@ export default function AppointmentScreen() {
                 <Text style={styles.appointmentMonth}>{appointment.date.split(' ')[0]}</Text>
               </View>
               <View style={styles.appointmentInfo}>
-                <Text style={styles.appointmentDoctor}>{appointment.doctor}</Text>
+                <Text style={styles.appointmentDoctor}>{appointment.doctor_name}</Text>
                 <Text style={styles.appointmentSpecialty}>{appointment.specialty}</Text>
                 <View style={styles.appointmentMeta}>
                   <Ionicons name="time" size={14} color="#e6b1d1" />
