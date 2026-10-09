@@ -1,0 +1,115 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --cor-primaria: #8B008B;
+  --cor-primaria-hover: #6E006E;
+  --cor-primaria-escura: #4B0049;
+  --cor-fundo-rosa: #FFE4F3;
+  --cor-fundo-rosa-2: #F8D0EA;
+  --cor-fundo: #FFFFFF;
+  --cor-borda-input: #8B008B;
+  --cor-texto: #1A1A1A;
+  --cor-texto-claro: #FFFFFF;
+  --cor-placeholder: #9A7A95;
+  --cor-link: #8B008B;
+  --status-normal: #2E9E4F;
+  --status-atencao: #F2A900;
+  --status-alerta: #D62839;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Open Sans', sans-serif;
+  background-color: var(--cor-fundo);
+  color: var(--cor-texto);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Scrollbar personalizada */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--cor-fundo-rosa);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--cor-primaria);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cor-primaria-hover);
+}
+
+/* Animações suaves */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Efeitos de hover aprimorados */
+button {
+  transition: all 0.2s ease-in-out;
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+/* Cards com sombra suave */
+.shadow-card {
+  box-shadow: 0 4px 12px rgba(139, 0, 139, 0.15);
+}
+
+.shadow-card-hover:hover {
+  box-shadow: 0 6px 20px rgba(139, 0, 139, 0.25);
+  transform: translateY(-2px);
+  transition: all 0.3s ease;
+}
+
+/* Inputs com foco melhorado */
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(139, 0, 139, 0.2);
+}
+
+/* Toast styles */
+.toast-success {
+  background-color: var(--status-normal);
+  color: white;
+}
+
+.toast-error {
+  background-color: var(--status-alerta);
+  color: white;
+}
+
+.toast-warning {
+  background-color: var(--status-atencao);
+  color: white;
+}
